@@ -1,0 +1,9 @@
+{
+  "name": "super_fun-cloud-functions",
+  "version": "0.0.0",
+  "description": "Super_fun Cloud Functions",
+  "main": "app.js",
+  "author": {
+    "name": ""
+  }
+}

@@ -37,11 +37,11 @@ exports.getGroceryKeys = functions.https.onCall(async (data, context) => {
         const uniqueProductDepartments = new Set(productDepartments);
 
         // Get a reference to the user ID in the Realtime Database
-        const userRef = db.ref(`data/Clients/${data.userId}`);
+        //const userRef = db.ref(`data/Clients/${data.userId}`);
         // Add the set of classes to the user ID in the Realtime Database
-        await userRef.set({
-            classes_set: Array.from(uniqueProductDepartments),
-        });
+        /*await userRef.set({
+          classes_set: Array.from(uniqueProductDepartments),
+        });*/
         return Array.from(uniqueProductDepartments);
     } catch (error) {
         console.error(error);
@@ -61,19 +61,25 @@ exports.getDepartmentItems = functions.https.onCall(async (data, context) => {
         const db = admin.database();
 
         // Retrieve the client node based on the provided userId
-        const clientsSnapshot = await db.ref('Clients').child(userId).once('value');
+        const clientsSnapshot = await db.ref("data/Clients").child(userId).once("value");
         const client = clientsSnapshot.val();
 
-        if (!client || !client.products) {
-            return [];
+        /*if (!client || !client.products) {
+            return ['aaaaaaa'];
+        }*/
+
+        if (!client.products) {
+            return ['aaaaaaa'];
         }
 
         const productList = client.products;
+        const productListArray = Array.from(productList);
 
-        const departmentSnapshot = await db.ref(`Departments/${departmentName}/items`).once('value');
+        //const departmentSnapshot = await db.ref('data/Departments/${departmentName}/items').once("value");
+        const departmentSnapshot = await db.ref("data/Departments/Dairy/items").once("value");
         const departmentItems = departmentSnapshot.val() || [];
 
-        const departmentProducts = productList.filter(product => departmentItems.includes(product));
+        const departmentProducts = productListArray.filter(product => departmentItems.includes(product));
 
         return Array.from(departmentProducts);
 
@@ -92,7 +98,7 @@ exports.getDepartmentsByOrder = functions.https.onCall(async (data, context) => 
         const db = admin.database();
 
         // Retrieve the client node based on the provided userId
-        const clientsSnapshot = await db.ref('Clients').child(userId).once('value');
+        const clientsSnapshot = await db.ref("data/Clients").child(userId).once("value");
         const client = clientsSnapshot.val();
 
         if (!client || !client.products) {
@@ -100,9 +106,10 @@ exports.getDepartmentsByOrder = functions.https.onCall(async (data, context) => 
         }
 
         const productList = client.products;
+        const productListArray = Array.from(productList);
 
         // Prepare data to pass to getGroceryKeys function
-        const getGroceryKeysData = { products: productList };
+        const getGroceryKeysData = { products: productListArray };
 
         // Invoke getGroceryKeys function using the Firebase Admin SDK
         const departmentsOnRoute = await admin

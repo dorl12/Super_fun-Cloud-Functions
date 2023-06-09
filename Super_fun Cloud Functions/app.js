@@ -71,15 +71,23 @@ exports.getDepartmentItems = functions.https.onCall(async (data, context) => {
         const productString = client.products;
 
         // Remove the opening and closing curly braces
-        const trimmedString = productString.slice(1, -1);
+        const trimmedProductString = productString.slice(1, -1);
 
         // Split the string by comma and trim whitespace from each element
-        const productArray = trimmedString.split(',').map(item => item.trim());
+        const productArray = trimmedProductString.split(',').map(item => item.trim());
 
-        const departmentSnapshot = await db.ref(`data/Departments/'${departmentName}'/items`).once("value");
-        const departmentItems = departmentSnapshot.val() || [];
+        const departmentSnapshot = await db.ref(`data/Departments/${departmentName}`).once("value");
+        const department = departmentSnapshot.val();
 
-        const departmentProducts = productArray.filter(product => departmentItems.includes(product));
+        const departmentItemsString = department.items;
+
+        // Remove the opening and closing curly braces
+        const trimmedItemsString = departmentItemsString.slice(1, -1);
+
+        // Split the string by comma and trim whitespace from each element
+        const departmentItemsArray = trimmedItemsString.split(',').map(item => item.trim());
+
+        const departmentProducts = productArray.filter(product => departmentItemsArray.includes(product));
 
         return departmentProducts;
 
@@ -120,3 +128,7 @@ exports.getDepartmentsByOrder = functions.https.onCall(async (data, context) => 
         throw new functions.https.HttpsError("internal", error.message);
     }
 });
+
+
+
+

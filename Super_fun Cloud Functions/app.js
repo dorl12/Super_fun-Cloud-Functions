@@ -2,18 +2,20 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 admin.initializeApp();
 
+// Function to create an array of departments containing the user's products
 exports.getGroceryKeys = functions.https.onCall(async (data, context) => {
     try {
-        // Get the list of groceries from the data parameter
+        // Get the list of products from the data parameter
         const productList = data.products;
 
         // Create a reference to the database
         const db = admin.database();
 
+        // Function to return the department of the given product
         const fetchProductDepartment = async (productName) => {
             const snap = await db.ref("data/Departments").once("value");
 
-            // This loop iterates over children of Departments
+            // Loop to iterate over the departments in the db
             const children = snap.val();
             for (const childNodeKey in children) {
                 if (Object.hasOwnProperty.call(children, childNodeKey)) {
@@ -27,15 +29,16 @@ exports.getGroceryKeys = functions.https.onCall(async (data, context) => {
             throw new Error(`Product '${productName}' not found`);
         };
 
-        // Map over the grocery list and fetch the keys
+        // Map over the products list and fetch the keys
         const productDepartmentPromises = productList.map((productName) =>
             fetchProductDepartment(productName),
         );
 
-        // Wait for all the promises to resolve and return the set of keys
+        // Wait for all the promises to resolve and create the set of deparments
         const productDepartments = await Promise.all(productDepartmentPromises);
         const uniqueProductDepartments = new Set(productDepartments);
 
+        // Return an array of departments
         return Array.from(uniqueProductDepartments);
     } catch (error) {
         console.error(error);
@@ -43,6 +46,7 @@ exports.getGroceryKeys = functions.https.onCall(async (data, context) => {
     }
 });
 
+// Function to create an array of the products of the given department
 exports.getDepartmentItems = functions.https.onCall(async (data, context) => {
     try {
         // Get the ID of the user from the data parameter
@@ -118,7 +122,165 @@ function calculateDistance(point1, point2) {
     return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
 }
 
-// Function to find the shortest route
+class PriorityQueue {
+    constructor() {
+        this.queue = [];
+    }
+
+    enqueue(element, priority) {
+        const item = { element, priority };
+        let added = false;
+
+        for (let i = 0; i < this.queue.length; i++) {
+            if (item.priority < this.queue[i].priority) {
+                this.queue.splice(i, 0, item);
+                added = true;
+                break;
+            }
+        }
+
+        if (!added) {
+            this.queue.push(item);
+        }
+    }
+
+    dequeue() {
+        if (this.isEmpty()) {
+            return null;
+        }
+
+        return this.queue.shift();
+    }
+
+    isEmpty() {
+        return this.queue.length === 0;
+    }
+}
+
+
+function calculateDistanceOfShortestPath(graph, start, end) {
+    // Create a priority queue to store the nodes and their distances
+    const queue = new PriorityQueue();
+
+    // Create an object to store the distances from the start node to each node
+    const distances = {};
+
+    const vertices = Array.from(Object.keys(graph));
+
+    // Set the distance of the start node to 0
+    distances[start] = 0;
+
+    // Initialize the distances
+    vertices.forEach(vertex => {
+        if (vertex !== start) {
+            distances[vertex] = Infinity;
+        }
+    });
+
+    // Enqueue the start node with priority 0
+    queue.enqueue(start, 0);
+
+    // Loop until the queue is empty
+    while (!queue.isEmpty()) {
+        // Dequeue the node with the lowest distance
+        const { element: current, priority: currentDistance } = queue.dequeue();
+
+        // Stop if we reach the end node
+        if (current === end) break;
+
+        // Check the neighbors of the current node
+        for (const neighbor in graph[current]) {
+            // Calculate the new distance from the start node to the neighbor node
+            const distance = currentDistance + graph[current][neighbor];
+
+            // If the new distance is shorter than the current distance, update it
+            if (distance < distances[neighbor]) {
+                distances[neighbor] = distance;
+
+                // Enqueue the neighbor node with the new priority (distance)
+                queue.enqueue(neighbor, distance);
+            }
+        }
+    }
+
+    // Return the distance of the shortest path between the start and end nodes
+    return distances[end];
+}
+
+
+// Function to calculate the shortest path from start to end
+function calculateShortestPath(graph, start, end) {
+    // Create a priority queue to store the nodes and their distances
+    const queue = new PriorityQueue();
+
+    // Create an object to store the distances from the start node to each node
+    const distances = {};
+
+    // Create an object to store the previous node in the shortest path
+    const previous = {};
+
+    const vertices = Array.from(Object.keys(graph));
+
+    // Set the distance of the start node to 0
+    distances[start] = 0;
+
+    // Initialize the distances
+    vertices.forEach(vertex => {
+        if (vertex !== start) {
+            distances[vertex] = Infinity;
+        }
+        previous[vertex] = null;
+    });
+
+    // Enqueue the start node with priority 0
+    queue.enqueue(start, 0);
+
+    // Loop until the queue is empty
+    while (!queue.isEmpty()) {
+        // Dequeue the node with the highest priority (lowest distance)
+        const current = queue.dequeue().element;
+
+        // Stop if we reach the end node
+        if (current === end) break;
+
+        // Check the neighbors of the current node
+        for (const neighbor in graph[current]) {
+            // Calculate the new distance from the start node to the neighbor node
+            const distance = distances[current] + graph[current][neighbor];
+
+            // If the new distance is shorter than the current distance, update it
+            if (distance < distances[neighbor]) {
+                distances[neighbor] = distance;
+                previous[neighbor] = current;
+                // Enqueue the neighbor node with the new priority (distance)
+                queue.enqueue(neighbor, distance);
+            }
+        }
+
+        // Check if the end node is a neighbor of the current node
+        if (end in graph[current]) {
+            const distanceToEnd = distances[current] + graph[current][end];
+            if (distanceToEnd < distances[end]) {
+                distances[end] = distanceToEnd;
+                previous[end] = current;
+            }
+        }
+    }
+
+    // Build the shortest path by backtracking from the end node to the start node
+    const shortestPath = [];
+    let current = end;
+
+    while (current !== null) {
+        shortestPath.unshift(current);
+        current = previous[current];
+    }
+
+    return shortestPath;
+}
+
+
+// Function to find the shortest route of the user in the supermarket
 async function findShortestRoute(departments) {
 
     // Reference to the Firebase Realtime Database
@@ -138,12 +300,6 @@ async function findShortestRoute(departments) {
 
         // Add vertices to the graph
         for (const department in vertices) {
-            //const departmentPositionString = vertices[department];
-            //const trimmedString = departmentPositionString.slice(1, -1);
-            //const [xStr, yStr] = trimmedString.split(',').map(value => value.trim());
-            //const x = Number(xStr);
-            //const y = Number(yStr);
-            //graph[department] = { x, y };
             graph[department] = {};
         }
 
@@ -157,140 +313,53 @@ async function findShortestRoute(departments) {
             graph[department2][department1] = cost;
         }
 
-        /*        // Perform a breadth-first search (BFS) to find the shortest route
-                const queue = [['Entrance', [], 0]];
-                //const visited = new Set(['Entrance']);
-        
-                ////////////////is it okay that visited is an array instead of set//////////////////////////
-                const visited = ['Entrance'];
-                //const departmentsArray = new Set(departments);
-                const targetDepartments = new Array();
-                departments.forEach((department) => {
-                    targetDepartments.push(department);
-                });
-                let shortestRoute = null;
-                let minCost = Infinity;
-        
-                // Continue from here!!!
-        
-                while (queue.length > 0) {
-                    const [current, path, currentCost] = queue.shift();
-        
-                    // Check if the current node is in the target departments set
-                    if (targetDepartments.includes(current)) {
-                        const index = targetDepartments.indexOf(current);
-                        targetDepartments.splice(index, 1);
-                    }
-                    
-                    // Check if the current node is 'Exit' and the route includes all the departments
-                    if (current === 'Exit') {
-                        //return "current===Exit";
-                        if (currentCost < minCost && targetDepartments.size === 0) {
-                            return "currentCost < minCost && targetDepartments.size === 0";
-                            shortestRoute = path;
-                            minCost = currentCost;
-                        }
-                    }
-        
-                    // Get the neighbors of the current node
-                    const neighbors = Object.keys(graph[current]);
-        
-                    // Enqueue unvisited neighbors
-                    for (const neighbor of neighbors) {
-                        if (!visited.includes(neighbor)) {
-                            visited.push(neighbor);
-                            const neighborCost = currentCost + graph[current][neighbor];
-                            queue.push([neighbor, [...path, neighbor], neighborCost]);
-                        }
-                    }
-                }
-        
-                // Return the shortest route
-                return shortestRoute;*/
-        // Perform a breadth-first search (BFS) to find the shortest route
-        /*        const queue = [['Entrance', [], 0, [...departments]]];
-                const visited = ['Entrance'];
-        
-                while (queue.length > 0) {
-                    const [current, path, currentCost, remainingDepartments] = queue.shift();
-        
-                    // Check if all departments have been visited
-                    if (remainingDepartments.length === 0) {
-                        let isValidPath = true;
-                        for (const department of departments) {
-                            if (!path.includes(department)) {
-                                isValidPath = false;
-                                break;
-                            }
-                        }
-        
-                        if (isValidPath) {
-                            return path;
-                        }
-                    }
-        
-                    // Get the neighbors of the current node
-                    const neighbors = Object.keys(graph[current]);
-        
-                    // Enqueue unvisited neighbors
-                    for (const neighbor of neighbors) {
-                        if (!visited.includes(neighbor)) {
-                            const updatedRemainingDepartments = remainingDepartments.filter(dep => dep !== neighbor);
-                            visited.push(neighbor);
-                            const neighborCost = currentCost + graph[current][neighbor];
-                            queue.push([neighbor, [...path, neighbor], neighborCost, updatedRemainingDepartments]);
-                        }
-                    }
-                }
-        
-                // If no valid path is found
-                return null;*/
-        // Perform a breadth-first search (BFS) to find the shortest route
-        const queue = [['Entrance', [], 0, [...departments]]];
-        const visited = ['Entrance'];
-        let lowestCost = Infinity;
-        let lowestPath = [];
+        // Step 3: Initialize a Short Path Vector (SPV) containing the start point
+        const startPoint = 'Entrance';
+        const SPV = [startPoint];
 
-        while (queue.length > 0) {
-            const [current, path, currentCost, remainingDepartments] = queue.shift();
+        // Step 4: Set startPoint as a temporary start point tempPoint
+        let tempPoint = startPoint;
 
-            // Check if all departments have been visited
-            if (remainingDepartments.length === 0) {
-                let isValidPath = true;
-                for (const department of departments) {
-                    if (!path.includes(department)) {
-                        isValidPath = false;
-                        break;
-                    }
-                }
+        // Step 10: Repeat step (5-9) until n = 0
+        while (departments.length > 0) {
+            let shortestDistance = Infinity;
+            let closestPoint;
 
-                if (isValidPath && currentCost < lowestCost) {
-                    lowestCost = currentCost;
-                    lowestPath = path;
+            // Step 5: Find the shortest path using Dijkstra's algorithm
+            // from the temporary start point tempPoint to all points in S
+            for (const department of departments) {
+                // Calculate the distance from tempPoint to department
+                const distance = calculateDistanceOfShortestPath(graph, tempPoint, department);
+                if (distance < shortestDistance) {
+                    shortestDistance = distance;
+                    closestPoint = department;
                 }
             }
+            // Step 6: Take the shortest calculated path and add it to SPV
+            SPV.push(closestPoint);
 
-            // Get the neighbors of the current node
-            const neighbors = Object.keys(graph[current]);
-
-            // Enqueue unvisited neighbors
-            for (const neighbor of neighbors) {
-                if (!visited.includes(neighbor)) {
-                    const updatedRemainingDepartments = remainingDepartments.filter(dep => dep !== neighbor);
-                    visited.push(neighbor);
-                    const neighborCost = currentCost + graph[current][neighbor];
-                    queue.push([neighbor, [...path, neighbor], neighborCost, updatedRemainingDepartments]);
-                }
+            // Step 7: Delete the point Vi from the list of points to visit
+            if (departments.includes(closestPoint)) {
+                departments.splice(departments.indexOf(closestPoint), 1);
             }
+
+            // Step 8: Set Vi as temporary start point tempPoint
+            tempPoint = closestPoint;
+
+            // Step 9: n = n - 1
         }
 
-        // If a valid path with the lowest cost is found
-        if (lowestPath.length > 0) {
-            return lowestPath;
-        }
+        // Step 11: The SPV is the forward path for all V in S
 
-        // If no valid path is found
-        return null;
+        // Use Dijkstra's algorithm to find the path from the last point in SPV to startPoint
+        const shortestPathBack = calculateShortestPath(graph, SPV[SPV.length - 1], startPoint);
+
+        // The SPV is the forward path, and shortestPathBack is the path for returning to the start point
+        const fullPath = [...SPV, ...shortestPathBack.slice(1)];
+
+        // Replace the return statement with the appropriate data or further processing
+        return fullPath;
+
     } catch (error) {
         // Handle any errors
         console.error('Error:', error);
@@ -299,6 +368,17 @@ async function findShortestRoute(departments) {
     }
 }
 
+function getIntersection(departments, routeOnGraph) {
+    const intersection = [];
+    for (const element of routeOnGraph) {
+        if (departments.includes(element) && !intersection.includes(element)) {
+            intersection.push(element);
+        }
+    }
+    return intersection;
+}
+
+// Function to create an array of departments according to the order of the shortest path
 exports.getDepartmentsByOrder = functions.https.onCall(async (data, context) => {
     try {
         // Get the ID of the user from the data parameter
@@ -323,14 +403,12 @@ exports.getDepartmentsByOrder = functions.https.onCall(async (data, context) => 
         // Split the string by comma and trim whitespace from each element
         const departmentArray = trimmedString.split(',').map(item => item.trim());
 
+        const departments = Array.from(departmentArray);
+
         // Call the findShortestRoute function
         const shortestRouteInGraph = await findShortestRoute(departmentArray);
 
-        return shortestRouteInGraph;
-
-        // Find the intersection between the original array of departments and the nodes of the graph
-        const intersectionWithOrder = new Set(departmentArray);
-        const shortestRoute = shortestRouteInGraph.filter(element => intersectionWithOrder.has(element));
+        const shortestRoute = getIntersection(departments, shortestRouteInGraph);
 
         return shortestRoute;
 
@@ -353,7 +431,6 @@ exports.isProductExist = functions.https.onCall(async (data, context) => {
 
         // Loop through each department
         for (const department in departments) {
-
             // Get the list of items of the department
             const itemsString = departments[department].items || {};
 
@@ -361,19 +438,16 @@ exports.isProductExist = functions.https.onCall(async (data, context) => {
             const trimmedString = itemsString.slice(1, -1);
 
             // Split the string by comma and trim whitespace from each element
-            const itemsArray = trimmedString.split(',').map(item => item.trim());
+            const itemsArray = trimmedString.split(",").map(item => item.trim());
 
             if (itemsArray.includes(product)) {
-                return { result: 'The product exists.' };
+                return { result: "The product exists." };
             }
         }
 
-        return { error: "The product doesn't exist." };
+        throw new Error("The product doesn't exist.");
     } catch (error) {
         console.error('Error checking product:', error);
-        return { error: 'Internal Server Error' };
+        throw new functions.https.HttpsError('internal', 'Internal Server Error');
     }
 });
-
-
-

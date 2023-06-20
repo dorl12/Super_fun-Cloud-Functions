@@ -36,6 +36,8 @@ exports.getGroceryKeys = functions.https.onCall(async (data, context) => {
 
         // Wait for all the promises to resolve and create the set of deparments
         const productDepartments = await Promise.all(productDepartmentPromises);
+
+        // Create a set to avoid duplicates
         const uniqueProductDepartments = new Set(productDepartments);
 
         // Return an array of departments
@@ -75,9 +77,11 @@ exports.getDepartmentItems = functions.https.onCall(async (data, context) => {
         // Split the string by comma and trim whitespace from each element
         const productArray = trimmedProductString.split(',').map(item => item.trim());
 
+        // Get a reference to the given department
         const departmentSnapshot = await db.ref(`data/Departments/${departmentName}`).once("value");
         const department = departmentSnapshot.val();
 
+        // Get a list of products of the given department
         const departmentItemsString = department.items;
 
         // Remove the opening and closing curly braces
@@ -86,6 +90,7 @@ exports.getDepartmentItems = functions.https.onCall(async (data, context) => {
         // Split the string by comma and trim whitespace from each element
         const departmentItemsArray = trimmedItemsString.split(',').map(item => item.trim());
 
+        // Get the department's products exist in the user's list
         const departmentProducts = productArray.filter(product => departmentItemsArray.includes(product));
 
         return departmentProducts;
@@ -122,11 +127,13 @@ function calculateDistance(point1, point2) {
     return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
 }
 
+// Defining a PriorityQueue class for Dijkstra's algorithm
 class PriorityQueue {
     constructor() {
         this.queue = [];
     }
 
+    // Function to add an element to the queue
     enqueue(element, priority) {
         const item = { element, priority };
         let added = false;
@@ -144,6 +151,7 @@ class PriorityQueue {
         }
     }
 
+    // Function to delete an element from the queue
     dequeue() {
         if (this.isEmpty()) {
             return null;
@@ -152,12 +160,13 @@ class PriorityQueue {
         return this.queue.shift();
     }
 
+    // Function to check whether the queue is empty
     isEmpty() {
         return this.queue.length === 0;
     }
 }
 
-
+// Function to calculate the distance of the shortest path from start to end
 function calculateDistanceOfShortestPath(graph, start, end) {
     // Create a priority queue to store the nodes and their distances
     const queue = new PriorityQueue();
@@ -165,12 +174,13 @@ function calculateDistanceOfShortestPath(graph, start, end) {
     // Create an object to store the distances from the start node to each node
     const distances = {};
 
+    // Get the vertices of the graph
     const vertices = Array.from(Object.keys(graph));
 
     // Set the distance of the start node to 0
     distances[start] = 0;
 
-    // Initialize the distances
+    // Initialize the distances to infinity
     vertices.forEach(vertex => {
         if (vertex !== start) {
             distances[vertex] = Infinity;
@@ -219,12 +229,13 @@ function calculateShortestPath(graph, start, end) {
     // Create an object to store the previous node in the shortest path
     const previous = {};
 
+    // Get the vertices of the graph
     const vertices = Array.from(Object.keys(graph));
 
     // Set the distance of the start node to 0
     distances[start] = 0;
 
-    // Initialize the distances
+    // Initialize the distances to inifinity and the previous node of each node to null
     vertices.forEach(vertex => {
         if (vertex !== start) {
             distances[vertex] = Infinity;
@@ -313,20 +324,20 @@ async function findShortestRoute(departments) {
             graph[department2][department1] = cost;
         }
 
-        // Step 3: Initialize a Short Path Vector (SPV) containing the start point
+        // Initialize a Short Path Vector (SPV) containing the start point
         const startPoint = 'Entrance';
         const SPV = [startPoint];
 
-        // Step 4: Set startPoint as a temporary start point tempPoint
+        // Set startPoint as a temporary start point
         let tempPoint = startPoint;
 
-        // Step 10: Repeat step (5-9) until n = 0
+        // Calculate the forward path for all departments that must be visited 
         while (departments.length > 0) {
             let shortestDistance = Infinity;
             let closestPoint;
 
-            // Step 5: Find the shortest path using Dijkstra's algorithm
-            // from the temporary start point tempPoint to all points in S
+            // Find the shortest path using Dijkstra's algorithm
+            // from the temporary start point to all points in departments
             for (const department of departments) {
                 // Calculate the distance from tempPoint to department
                 const distance = calculateDistanceOfShortestPath(graph, tempPoint, department);
@@ -335,21 +346,17 @@ async function findShortestRoute(departments) {
                     closestPoint = department;
                 }
             }
-            // Step 6: Take the shortest calculated path and add it to SPV
+            // Take the shortest calculated path and add it to SPV
             SPV.push(closestPoint);
 
-            // Step 7: Delete the point Vi from the list of points to visit
+            // Delete the closest point from the list of points to visit
             if (departments.includes(closestPoint)) {
                 departments.splice(departments.indexOf(closestPoint), 1);
             }
 
-            // Step 8: Set Vi as temporary start point tempPoint
+            // Set the closest point as temporary start point
             tempPoint = closestPoint;
-
-            // Step 9: n = n - 1
         }
-
-        // Step 11: The SPV is the forward path for all V in S
 
         // Use Dijkstra's algorithm to find the path from the last point in SPV to startPoint
         const shortestPathBack = calculateShortestPath(graph, SPV[SPV.length - 1], startPoint);
@@ -357,7 +364,6 @@ async function findShortestRoute(departments) {
         // The SPV is the forward path, and shortestPathBack is the path for returning to the start point
         const fullPath = [...SPV, ...shortestPathBack.slice(1)];
 
-        // Replace the return statement with the appropriate data or further processing
         return fullPath;
 
     } catch (error) {
@@ -368,6 +374,7 @@ async function findShortestRoute(departments) {
     }
 }
 
+// Function to find the intersection of departments and routeOnGraph according to the order of routeOnGraph
 function getIntersection(departments, routeOnGraph) {
     const intersection = [];
     for (const element of routeOnGraph) {
@@ -395,6 +402,7 @@ exports.getDepartmentsByOrder = functions.https.onCall(async (data, context) => 
             return [];
         }
 
+        // Get the list of departments on the user's route
         const departmentListString = client.all_departments;
 
         // Remove the opening and closing curly braces
@@ -403,11 +411,13 @@ exports.getDepartmentsByOrder = functions.https.onCall(async (data, context) => 
         // Split the string by comma and trim whitespace from each element
         const departmentArray = trimmedString.split(',').map(item => item.trim());
 
+        // Create an array of departments
         const departments = Array.from(departmentArray);
 
         // Call the findShortestRoute function
         const shortestRouteInGraph = await findShortestRoute(departmentArray);
 
+        // Get the intersection of departments and the output of findShortestRoute
         const shortestRoute = getIntersection(departments, shortestRouteInGraph);
 
         return shortestRoute;
@@ -418,6 +428,7 @@ exports.getDepartmentsByOrder = functions.https.onCall(async (data, context) => 
     }
 });
 
+// Function to check whether the given product exist in the DB
 exports.isProductExist = functions.https.onCall(async (data, context) => {
     try {
         // Get the product from the data parameter
@@ -426,6 +437,7 @@ exports.isProductExist = functions.https.onCall(async (data, context) => {
         // Create a reference to the database
         const db = admin.database();
 
+        // Get the departments data
         const snapshot = await db.ref("data/Departments").once("value");
         const departments = snapshot.val();
 
@@ -440,6 +452,7 @@ exports.isProductExist = functions.https.onCall(async (data, context) => {
             // Split the string by comma and trim whitespace from each element
             const itemsArray = trimmedString.split(",").map(item => item.trim());
 
+            // Check whether the department includes the product 
             if (itemsArray.includes(product)) {
                 return { result: "The product exists." };
             }
@@ -451,3 +464,7 @@ exports.isProductExist = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('internal', 'Internal Server Error');
     }
 });
+
+
+
+

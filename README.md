@@ -6,7 +6,7 @@ Cloud Functions are a serverless framework that allows you automatically run bac
 In this project, the following functions are triggered by the flutter app to support list products insertion and building
 the shortest route for the customer to pick the products he wants to buy.  
 
-The functions:  
+The main functions:  
 
 getGroceryKeys - gets the list of products of the customer and returns an array of departments containing those products.  
 

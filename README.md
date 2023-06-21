@@ -14,5 +14,14 @@ getDepartmentItems - gets a name of department and returns an array of the produ
 
 getDepartmentsByOrder - gets a list of departments and returns an array of departments according to the order of the shortest path in the supermarket.  
 
-isProductExist - The function gets a name of a product and checks whether the product exist in the DB.
+isProductExist - The function gets a name of a product and checks whether the product exist in the DB.  
+
+How to run the functions:
+1. Clone the repository
+2. Set up Firebase project
+3. Set up Firebase Admin SDK
+4. Install dependencies
+5. Configure Firebase Admin SDK
+6. Deploy Cloud Functions
+7. Test the Cloud Functions
 
